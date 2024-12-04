@@ -1,0 +1,10 @@
+a.out
+game_sql
+makefile
+test
+main.o
+*.o
+pruebas
+pruebas.cpp
+main
+gramatica.cpp
