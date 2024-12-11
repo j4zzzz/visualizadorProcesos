@@ -7,10 +7,11 @@
 #include <filesystem>
 #include <algorithm>
 #include <iomanip>
-#include <unistd.h> 
-#include <iterator> 
+#include <unistd.h> // Para sysconf(_SC_CLK_TCK)
+#include <iterator> // Para std::istream_iterator
 #include <chrono>
 
+// Clase Proceso
 class Proceso {
 public:
     std::string nombre;
@@ -23,6 +24,7 @@ public:
         : nombre(nombre), id(id), rafaga(rafaga), tiempoLlegada(tiempoLlegada), estado(estado) {}
 };
 
+// Clase CPU
 class CPU {
 public:
     std::vector<Proceso> procesos;
@@ -32,6 +34,7 @@ public:
     }
 };
 
+// Función para convertir ticks en una hora legible
 std::string convertirTicksAHora(long long startTimeTicks) {
     long ticksPorSegundo = sysconf(_SC_CLK_TCK);
     long long tiempoInicioSegundos = startTimeTicks / ticksPorSegundo;
@@ -54,11 +57,13 @@ std::string convertirTicksAHora(long long startTimeTicks) {
     return oss.str();
 }
 
+// Función para llenar la lista de procesos en la CPU
 void capturarProcesos(CPU& cpu) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib(1, 10);
 
+    int tiempoReferencia = -1;  
 
     for (const auto& entry : std::filesystem::directory_iterator("/proc")) {
         if (entry.is_directory()) {
@@ -76,18 +81,21 @@ void capturarProcesos(CPU& cpu) {
                         std::string statLine;
                         if (statFile.is_open() && std::getline(statFile, statLine)) {
                             std::istringstream iss(statLine);
+                            // Usamos llaves para la inicialización del vector
                             std::vector<std::string> statTokens{
                                 std::istream_iterator<std::string>(iss),
                                 std::istream_iterator<std::string>()
                             };
 
+                            // Verificamos que el vector tenga suficientes elementos
                             if (statTokens.size() > 21) {
                                 try {
                                     long long startTimeTicks = std::stoll(statTokens[21]);
                                     int tiempoLlegada = 0;
 
+                                    // Solo el primer proceso se toma como referencia con tiempo 0
                                     if (tiempoReferencia == -1) {
-                                        tiempoReferencia = startTimeTicks / sysconf(_SC_CLK_TCK);
+                                        tiempoReferencia = startTimeTicks / sysconf(_SC_CLK_TCK);  // Convertir ticks a segundos
                                     } else {
                                         int tiempoEnSegundos = startTimeTicks / sysconf(_SC_CLK_TCK);
                                         tiempoLlegada = tiempoEnSegundos - tiempoReferencia;
@@ -95,6 +103,7 @@ void capturarProcesos(CPU& cpu) {
 
                                     cpu.agregarProceso(nombreProceso, pid, rafaga, tiempoLlegada);
                                 } catch (const std::invalid_argument& e) {
+                                    // Si no se puede convertir, simplemente ignoramos ese proceso
                                     std::cerr << "Error al convertir el tiempo de inicio para el PID " << pid << std::endl;
                                 }
                             } else {
@@ -103,6 +112,7 @@ void capturarProcesos(CPU& cpu) {
                         }
                     }
                 } catch (...) {
+                    // Ignorar errores
                 }
             }
         }
@@ -125,4 +135,3 @@ int main() {
 
     return 0;
 }
-

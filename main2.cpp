@@ -30,8 +30,8 @@ class CPU {
 public:
     std::vector<Proceso> procesos;
 
-    void agregarProceso(const std::string& nombre, int rafaga, int tiempoLlegada) {
-        procesos.emplace_back(nombre, procesos.size(), rafaga, tiempoLlegada);
+    void agregarProceso(const std::string& nombre, int id, int rafaga, int tiempoLlegada) {
+        procesos.emplace_back(nombre, id, rafaga, tiempoLlegada);
     }
 };
 std::string convertirTicksAHora(long long startTimeTicks) {
@@ -61,6 +61,7 @@ void capturarProcesos(CPU& cpu) {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib(1, 10);
 
+    int tiempoReferencia = -1;  
 
     for (const auto& entry : std::filesystem::directory_iterator("/proc")) {
         if (entry.is_directory()) {
@@ -72,6 +73,7 @@ void capturarProcesos(CPU& cpu) {
                     std::string nombreProceso;
                     if (commFile.is_open() && std::getline(commFile, nombreProceso)) {
                         int pid = std::stoi(dirName);
+                        //std::cout<<pid<<" ";
                         int rafaga = distrib(gen);
 
                         std::ifstream statFile(entry.path() / "stat");
@@ -112,6 +114,7 @@ void capturarProcesos(CPU& cpu) {
 }
 
 
+
 // Función FIFO
 int fifo(CPU& cpu) {
     if (!cpu.procesos.empty()) {
@@ -132,9 +135,7 @@ int rr(CPU& cpu, int pos) {
         cpu.procesos[pos].rafaga -= 1; 
         if (cpu.procesos[pos].rafaga <= 0) {
             cpu.procesos.erase(cpu.procesos.begin() + pos);
-            for (size_t i = 0; i < cpu.procesos.size(); ++i) {
-                cpu.procesos[i].id = i; 
-            }
+            
             return (pos >= static_cast<int>(cpu.procesos.size())) ? 0 : pos; 
         }
         return pos; 
@@ -149,11 +150,8 @@ int sjf(CPU& cpu) {
         });
 
         cpu.procesos[0].rafaga -= 1; 
-        if (cpu.procesos[0].rafaga <= 0) {
+        if (cpu.procesos[0].rafaga == 0) {
             cpu.procesos.erase(cpu.procesos.begin()); 
-            for (size_t i = 0; i < cpu.procesos.size(); ++i) {
-                cpu.procesos[i].id = i; 
-            }
         }
         return 0; 
     }
@@ -196,7 +194,8 @@ void dibujarCPU(sf::RenderWindow& ventana, const CPU& cpu, int inicioY, const st
             // Dibujar ID/nombre
             sf::Text textoID;
             textoID.setFont(fuente);
-            textoID.setString(cpu.procesos[i].nombre);
+            // textoID.setString(cpu.procesos[i].nombre);
+            textoID.setString(std::to_string(cpu.procesos[i].id));
             textoID.setCharacterSize(18);
             textoID.setFillColor(sf::Color::White);
             textoID.setPosition(x, y + 10);
@@ -228,12 +227,14 @@ void balancearCPUs(CPU& cpu1, CPU& cpu2, CPU& cpu3, CPU& cpu4) {
             cpuMayor->procesos.pop_back();
 
             // Actualizar IDs de los procesos en ambas CPUs
+            /*
             for (size_t i = 0; i < cpuMenor->procesos.size(); ++i) {
                 cpuMenor->procesos[i].id = i;
             }
             for (size_t i = 0; i < cpuMayor->procesos.size(); ++i) {
                 cpuMayor->procesos[i].id = i;
             }
+            */
 
             cambios = true;
 
@@ -245,10 +246,52 @@ void balancearCPUs(CPU& cpu1, CPU& cpu2, CPU& cpu3, CPU& cpu4) {
     }
 }
 
+void DeleteporRango(std::vector<Proceso>& cpu1, std::vector<Proceso>& cpu2, std::vector<Proceso>& cpu3, std::vector<Proceso>& cpu4, int a, int b) {
+    auto borrarEnRango = [a, b](std::vector<Proceso>& procesos) {
+        procesos.erase(std::remove_if(procesos.begin(), procesos.end(), [a, b](const Proceso& p) {
+            return p.id >= a && p.id <= b;
+        }), procesos.end());
+    };
+
+    borrarEnRango(cpu1);
+    borrarEnRango(cpu2);
+    borrarEnRango(cpu3);
+    borrarEnRango(cpu4);
+}
+
+int ubicarProceso(const std::vector<Proceso>& cpu1, const std::vector<Proceso>& cpu2, const std::vector<Proceso>& cpu3, const std::vector<Proceso>& cpu4, int id) {
+    auto buscarEnCPU = [&id](const std::vector<Proceso>& procesos) {
+        return std::any_of(procesos.begin(), procesos.end(), [&id](const Proceso& p) {
+            return p.id == id;
+        });
+    };
+
+    if (buscarEnCPU(cpu1)) {
+        std::cout << "El proceso con ID " << id << " está en CPU 1.\n";
+        return 1;
+    }
+    if (buscarEnCPU(cpu2)) {
+        std::cout << "El proceso con ID " << id << " está en CPU 2.\n";
+        return 2;
+    }
+    if (buscarEnCPU(cpu3)) {
+        std::cout << "El proceso con ID " << id << " está en CPU 3.\n";
+        return 3;
+    }
+    if (buscarEnCPU(cpu4)) {
+        std::cout << "El proceso con ID " << id << " está en CPU 4.\n";
+        return 4;
+    }
+
+    std::cout << "El proceso con ID " << id << " no se encuentra en ninguna CPU.\n";
+    return -1;
+}
 
 int main() {
     // Crear las CPU con sus procesos
+    
     CPU cpu1, cpu2, cpu3, cpu4;
+    /*
 
     cpu1.agregarProceso("P1", 2, 0);
     cpu1.agregarProceso("P2", 4, 1);
@@ -282,7 +325,9 @@ int main() {
     {
         cpu1.agregarProceso("P"+std::to_string(i), i%9+1, i);
     }
-    
+    */
+    capturarProcesos(cpu1);
+
 
     // Crear ventana
     sf::RenderWindow ventana(sf::VideoMode(1200, 900), "Procesos de CPUs");
@@ -296,19 +341,46 @@ int main() {
     int localquantum = quantum;
     int pos = 0;
 
-    sf::RectangleShape boton(sf::Vector2f(200, 50));
+    // Pal de agregar
+    sf::RectangleShape boton(sf::Vector2f(90, 50));
     boton.setFillColor(sf::Color::Green);
-    boton.setPosition(900, 50);
+    boton.setPosition(900, 40);
 
     sf::Font fuente;
     fuente.loadFromFile("fonts/Arial.ttf");
 
     sf::Text textoBoton;
     textoBoton.setFont(fuente);
-    textoBoton.setString("Agregar Proceso");
+    textoBoton.setString("Agregar");
     textoBoton.setCharacterSize(18);
     textoBoton.setFillColor(sf::Color::White);
-    textoBoton.setPosition(910, 60);
+    textoBoton.setPosition(910, 50);
+
+    //Pal de eliminar
+
+    sf::RectangleShape botonEliminar(sf::Vector2f(90, 50));
+    botonEliminar.setFillColor(sf::Color::Red);
+    botonEliminar.setPosition(1000, 40);
+
+    sf::Text textobotonEliminar;
+    textobotonEliminar.setFont(fuente);
+    textobotonEliminar.setString("Eliminar");
+    textobotonEliminar.setCharacterSize(18);
+    textobotonEliminar.setFillColor(sf::Color::White);
+    textobotonEliminar.setPosition(1010, 50);
+
+    //Pal de bUSCAR
+
+    sf::RectangleShape botonBuscar(sf::Vector2f(90, 50));
+    botonBuscar.setFillColor(sf::Color::Yellow);
+    botonBuscar.setPosition(1100, 40);
+
+    sf::Text textobotonBuscar;
+    textobotonBuscar.setFont(fuente);
+    textobotonBuscar.setString("Buscar");
+    textobotonBuscar.setCharacterSize(18);
+    textobotonBuscar.setFillColor(sf::Color::White);
+    textobotonBuscar.setPosition(1110, 50);
 
     int procesoActual1 = -1, procesoActual2 = -1, procesoActual3 = -1, procesoActual4 = -1;
     int count = 0;
@@ -318,21 +390,47 @@ int main() {
             if (evento.type == sf::Event::Closed)
                 ventana.close();
             if (evento.type == sf::Event::MouseButtonPressed) {
-                if (boton.getGlobalBounds().contains(evento.mouseButton.x, evento.mouseButton.y)) {
-                    std::string nombre;
-                    int rafaga;
+                if (evento.type == sf::Event::MouseButtonPressed && evento.mouseButton.button == sf::Mouse::Left) {
+                    sf::Vector2f click(evento.mouseButton.x, evento.mouseButton.y);
+                    if (boton.getGlobalBounds().contains(click)) {
+                        std::string nombre;
+                        
+                        int rafaga;
+                        int id;
 
-                    std::cout << "Ingrese el nombre del proceso: ";
-                    std::cin >> nombre;
-                    std::cout << "Ingrese la ráfaga del proceso: ";
-                    std::cin >> rafaga;
+                        std::cout << "Ingrese el nombre del proceso: ";
+                        std::cin >> nombre;
+                        std::cout << "Ingrese EL ID del proceso: ";
+                        std::cin >> id;
+                        std::cout << "Ingrese la ráfaga del proceso: ";
+                        std::cin >> rafaga;
 
-                    CPU* cpuMenor = &cpu1;
-                    if (cpu2.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu2;
-                    if (cpu3.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu3;
-                    if (cpu4.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu4;
+                        CPU* cpuMenor = &cpu1;
+                        if (cpu2.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu2;
+                        if (cpu3.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu3;
+                        if (cpu4.procesos.size() < cpuMenor->procesos.size()) cpuMenor = &cpu4;
 
-                    cpuMenor->agregarProceso(nombre, rafaga, reloj.getElapsedTime().asSeconds());
+                        cpuMenor->agregarProceso(nombre, id, rafaga, reloj.getElapsedTime().asSeconds());
+                    }
+                    if (botonEliminar.getGlobalBounds().contains(click)) {
+                        int a,b;
+                        std::cout<<"Ingrese el rango a eliminar"<<std::endl;
+                        std::cout<<"Primer valor (menor): ";
+                        std::cin>>a;
+                        std::cout<<std::endl;
+                        std::cout<<"Segundo valor (mayor): ";
+                        std::cin>>b;
+
+                        DeleteporRango(cpu1.procesos, cpu2.procesos, cpu3.procesos, cpu4.procesos, a, b);
+                        std::cout << "Procesos eliminados en el rango.\n";
+                    }
+                    if (botonBuscar.getGlobalBounds().contains(click)) {
+                        int a;
+                        std::cout<<"Ingrese el ID a buscar: ";
+                        std::cin>>a;
+                        ubicarProceso(cpu1.procesos, cpu2.procesos, cpu3.procesos, cpu4.procesos, a);
+                    }
+                        
                 }
             }
         }
@@ -363,6 +461,12 @@ int main() {
         ventana.clear();
         ventana.draw(boton);
         ventana.draw(textoBoton);
+
+        ventana.draw(botonEliminar);
+        ventana.draw(textobotonEliminar);
+
+        ventana.draw(botonBuscar);
+        ventana.draw(textobotonBuscar);
 
         sf::Text textoCPU1, textoCPU2, textoCPU3, textoCPU4;
 
