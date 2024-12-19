@@ -29,6 +29,7 @@ public:
 class CPU {
 public:
     std::vector<Proceso> procesos;
+    
 
     void agregarProceso(const std::string& nombre, int id, int rafaga, int tiempoLlegada) {
         procesos.emplace_back(nombre, id, rafaga, tiempoLlegada);
@@ -73,7 +74,6 @@ void capturarProcesos(CPU& cpu) {
                     std::string nombreProceso;
                     if (commFile.is_open() && std::getline(commFile, nombreProceso)) {
                         int pid = std::stoi(dirName);
-                        //std::cout<<pid<<" ";
                         int rafaga = distrib(gen);
 
                         std::ifstream statFile(entry.path() / "stat");
@@ -127,7 +127,7 @@ int fifo(CPU& cpu) {
         }
         return 0;
     }
-    return -1; // si no hay procesos
+    return -1;
 }
 
 int rr(CPU& cpu, int pos) {
@@ -167,14 +167,7 @@ void dibujarCPU(sf::RenderWindow& ventana, const CPU& cpu, int inicioY, const st
     // nombre del proceso actual
     sf::Text textoTitulo;
     textoTitulo.setFont(fuente);
-    /*
-    if (procesoActual >= 0 && procesoActual < static_cast<int>(cpu.procesos.size())) {
-        textoTitulo.setString(titulo + " - Proceso actual: " + cpu.procesos[procesoActual].nombre);
-    } else {
-        textoTitulo.setString(titulo + " - Proceso actual: Ninguno");
-    }
-    textoTitulo.setCharacterSize(24);
-    */
+    
     textoTitulo.setFillColor(sf::Color::White);
     textoTitulo.setPosition(10, inicioY + 10);
     ventana.draw(textoTitulo);
@@ -225,16 +218,6 @@ void balancearCPUs(CPU& cpu1, CPU& cpu2, CPU& cpu3, CPU& cpu4) {
             Proceso procesoMovido = cpuMayor->procesos.back();
             cpuMenor->procesos.push_back(procesoMovido);
             cpuMayor->procesos.pop_back();
-
-            // Actualizar IDs de los procesos en ambas CPUs
-            /*
-            for (size_t i = 0; i < cpuMenor->procesos.size(); ++i) {
-                cpuMenor->procesos[i].id = i;
-            }
-            for (size_t i = 0; i < cpuMayor->procesos.size(); ++i) {
-                cpuMayor->procesos[i].id = i;
-            }
-            */
 
             cambios = true;
 
@@ -291,41 +274,7 @@ int main() {
     // Crear las CPU con sus procesos
     
     CPU cpu1, cpu2, cpu3, cpu4;
-    /*
-
-    cpu1.agregarProceso("P1", 2, 0);
-    cpu1.agregarProceso("P2", 4, 1);
-    cpu1.agregarProceso("P3", 6, 2);
-    cpu1.agregarProceso("P4", 8, 3);
-    cpu1.agregarProceso("P5", 10, 4);
-    cpu1.agregarProceso("PP1", 2, 0);
-    cpu1.agregarProceso("PP2", 4, 1);
-    cpu1.agregarProceso("PP3", 6, 2);
-    cpu1.agregarProceso("PP4", 8, 3);
-    cpu1.agregarProceso("PP5", 10, 4);
-
-    cpu2.agregarProceso("P1", 1, 0);
-    cpu2.agregarProceso("P2", 3, 1);
-    cpu2.agregarProceso("P3", 5, 2);
-    cpu2.agregarProceso("P4", 7, 3);
-    cpu2.agregarProceso("P5", 8, 4);
-
-    cpu3.agregarProceso("P1", 10, 0);
-    cpu3.agregarProceso("P2", 9, 1);
-    cpu3.agregarProceso("P3", 8, 2);
-    cpu3.agregarProceso("P4", 7, 3);
-    cpu3.agregarProceso("P5", 5, 4);
-
-    cpu4.agregarProceso("P1", 10, 0);
-    cpu4.agregarProceso("P2", 7, 1);
-    cpu4.agregarProceso("P3", 4, 2);
-    cpu4.agregarProceso("P4", 8, 3);
-    cpu4.agregarProceso("P5", 9, 4);
-    for (int i = 5; i < 400; i++)
-    {
-        cpu1.agregarProceso("P"+std::to_string(i), i%9+1, i);
-    }
-    */
+    
     capturarProcesos(cpu1);
 
 
@@ -341,7 +290,7 @@ int main() {
     int localquantum = quantum;
     int pos = 0;
 
-    // Pal de agregar
+    // Agregar
     sf::RectangleShape boton(sf::Vector2f(90, 50));
     boton.setFillColor(sf::Color::Green);
     boton.setPosition(900, 40);
@@ -356,7 +305,7 @@ int main() {
     textoBoton.setFillColor(sf::Color::White);
     textoBoton.setPosition(910, 50);
 
-    //Pal de eliminar
+    //Eliminar
 
     sf::RectangleShape botonEliminar(sf::Vector2f(90, 50));
     botonEliminar.setFillColor(sf::Color::Red);
@@ -369,7 +318,7 @@ int main() {
     textobotonEliminar.setFillColor(sf::Color::White);
     textobotonEliminar.setPosition(1010, 50);
 
-    //Pal de bUSCAR
+    //BUSCAR
 
     sf::RectangleShape botonBuscar(sf::Vector2f(90, 50));
     botonBuscar.setFillColor(sf::Color::Yellow);
@@ -505,8 +454,6 @@ int main() {
         dibujarCPU(ventana, cpu4, 660, "CPU4", colorReloj.getElapsedTime().asSeconds() < 0.25f ? procesoActual4 : -1);
 
         ventana.display();
-
-        // ESTABLECER TIEMPOS DE LLEGADA EN BASE AL RELOJ
     }
 
     return 0;
